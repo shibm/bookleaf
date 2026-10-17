@@ -37,18 +37,32 @@ npm run build
 npm start
 ```
 
-Open **http://localhost:3000**. The default `.env.example` also sets `SEED_DEMO=true`, so startup seeds missing demo records. The seed command is safe to repeat: existing accounts, passwords and books are retained. No fake support tickets are inserted.
+Open **http://localhost:3000**, or the backend port configured by `PORT` in `.env` (for example, **http://localhost:3030** when `PORT=3030`). The default `.env.example` also sets `SEED_DEMO=true`, so startup seeds missing demo records. The seed command is safe to repeat: existing accounts, passwords and books are retained. No fake support tickets are inserted.
 
-For React development, use two terminals after configuring MongoDB:
+### Development with automatic restarts
+
+After installing dependencies and configuring MongoDB, keep these commands running in two terminals:
 
 ```sh
-# Terminal 1 — backend, localhost:3000
+# Terminal 1 — backend with Nodemon, using PORT from .env
 npm run dev:server
+
 # Terminal 2 — React/Vite, localhost:5173
 npm run dev
 ```
 
-Open http://localhost:5173. Vite proxies `/api` and `/health` to the backend port set by `PORT` in `.env` (3000 by default). Run only one backend at a time: use either `npm start` or `npm run dev:server`. If you change `PORT`, restart both the backend and Vite. Production needs only `npm run build` followed by `npm start`.
+Open **http://localhost:5173** during development. Vite proxies `/api` and `/health` to the backend port set by `PORT` in `.env` (3000 by default).
+
+Nodemon is configured in `nodemon.json`:
+
+- Changes to JavaScript or JSON files in `src/`, or changes to `.env`, automatically restart the backend after a 300 ms delay.
+- Changes to API keys and MongoDB settings in `.env` are loaded on restart.
+- Generated builds, dependencies, archives and test output do not trigger backend restarts.
+- Type `rs` and press Enter in the Nodemon terminal to request a manual restart. Press Ctrl+C to stop it.
+
+Run only one backend at a time: stop an existing `npm start` or older watcher once before switching to `npm run dev:server`. After that, leave Nodemon running while you edit. React changes update through Vite. If you change `PORT`, restart Vite so its proxy uses the new backend port.
+
+For a production-style run, use `npm run build` followed by `npm start`; this serves the built React app and does not enable automatic restarts.
 
 ## Demo accounts
 

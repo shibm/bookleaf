@@ -14,7 +14,7 @@
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "package": "python3 scripts/package.py",
     "build": "vite build",
-    "dev:server": "node --watch src/server.js",
+    "dev:server": "nodemon src/server.js",
     "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
@@ -33,6 +33,7 @@
     "@playwright/test": "^1.64.1",
     "@vitejs/plugin-react": "^5.0.0",
     "mongodb-memory-server": "^10.2.0",
+    "nodemon": "^3.1.14",
     "prettier": "^3.9.10",
     "vite": "^7.1.0"
   }

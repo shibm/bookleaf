@@ -1,7 +1,39 @@
+# Dependencies and generated builds
 node_modules/
+/dist/
+
+# Local environment and secrets; retain the setup template
 .env
-*.sqlite*
-artifacts/
-.DS_Store
+.env.*
+!.env.example
+
+# Generated archives, screenshots and test output
+/artifacts/
 test-results/
 playwright-report/
+playwright/.cache/
+coverage/
+.nyc_output/
+
+# Tool caches and runtime logs
+.cache/
+.vite/
+*.tsbuildinfo
+logs/
+*.log
+*.pid
+*.pid.lock
+
+# Local database and Python packaging artifacts
+*.sqlite*
+__pycache__/
+*.py[cod]
+
+# OS and editor-local files
+.DS_Store
+._*
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
