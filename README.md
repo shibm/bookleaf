@@ -98,6 +98,10 @@ AI provider failures are logged with allowlisted error codes and HTTP status, an
 
 Implementation references: [official OpenAI Structured Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses). Live API behavior requires your key and model access; provider success/failure paths are covered with mocked responses.
 
+## Visual design
+
+The UI follows [BookLeaf’s public website](https://www.bookleafpub.in/): the official logo, coral accents, soft pink artwork, sans-serif typography and rounded calls to action. Brand assets are served locally from `public/brand/`; source references are in [Brand assets](docs/BRAND-ASSETS.md). The public website is a visual reference only; the assignment’s royalty policy and support workflows remain authoritative.
+
 ## Structure and schema
 
 ```text

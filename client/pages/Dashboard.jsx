@@ -23,31 +23,33 @@ export default function Dashboard({ user, navigate, notify }) {
   const s = stats?.data;
   return (
     <>
-      <Heading
-        eyebrow={
-          admin
-            ? 'A CLEARER VIEW, A BETTER RESPONSE'
-            : 'YOUR PUBLISHING JOURNEY'
-        }
-        title={
-          admin
-            ? 'Every author, heard.'
-            : `Welcome back, ${user.name.split(' ')[0]}.`
-        }
-        action={
-          <button
-            className="button"
-            onClick={() => navigate(admin ? '/tickets' : '/tickets/new')}
-          >
-            {admin ? <MessagesSquare size={17} /> : <Plus size={18} />}{' '}
-            {admin ? 'Manage ticket queue' : 'New support query'}
-          </button>
-        }
-      >
-        {admin
-          ? 'A thoughtful workspace for keeping every conversation moving.'
-          : 'A little overview of your books, earnings, and conversations.'}
-      </Heading>
+      <div className="dashboard-welcome">
+        <Heading
+          eyebrow={
+            admin
+              ? 'A CLEARER VIEW, A BETTER RESPONSE'
+              : 'YOUR PUBLISHING JOURNEY'
+          }
+          title={
+            admin
+              ? 'Every author, heard.'
+              : `Welcome back, ${user.name.split(' ')[0]}.`
+          }
+          action={
+            <button
+              className="button"
+              onClick={() => navigate(admin ? '/tickets' : '/tickets/new')}
+            >
+              {admin ? <MessagesSquare size={17} /> : <Plus size={18} />}{' '}
+              {admin ? 'Manage ticket queue' : 'New support query'}
+            </button>
+          }
+        >
+          {admin
+            ? 'A thoughtful workspace for keeping every conversation moving.'
+            : 'A little overview of your books, earnings, and conversations.'}
+        </Heading>
+      </div>
       <div className="stats">
         {admin ? (
           <>

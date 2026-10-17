@@ -1,6 +1,7 @@
 import React from 'react';
 import { useState } from 'react';
-import { Leaf, BookOpen, ArrowRight, LockKeyhole } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, LockKeyhole, BookOpen } from 'lucide-react';
+import Brand from '../components/Brand';
 import { api } from '../api';
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState(''),
@@ -29,41 +30,70 @@ export default function Login({ onLogin }) {
   return (
     <div className="login">
       <section className="login-story">
-        <div className="brand">
-          <div className="brand-icon">
-            <Leaf />
-          </div>
-          <div>
-            bookleaf<span>PUBLISHING</span>
-          </div>
-        </div>
-        <div>
-          <span className="eyebrow">YOUR WORDS. OUR SHARED JOURNEY.</span>
+        <a
+          className="brand"
+          href="https://www.bookleafpub.in/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Brand />
+        </a>
+        <div className="login-intro">
+          <span className="eyebrow">YOUR PUBLISHING JOURNEY, TOGETHER.</span>
           <h1>
-            Every great story
+            Publishing made easy.
             <br />
-            deserves support.
+            <span>
+              Support for every <br />
+              new chapter.
+            </span>
           </h1>
           <p>
             Your books, your royalties, and a team that’s always in your corner.
-            Welcome to your author workspace.
+            A little support for the stories only you can tell.
           </p>
-          <div className="story-art">
-            <BookOpen size={105} strokeWidth={0.7} />
-            <span>
-              THE NEXT
-              <br />
-              <i>chapter</i>
-              <small>STARTS WITH YOU</small>
-            </span>
+          <div
+            className="author-community"
+            aria-label="Authors from the BookLeaf community"
+          >
+            <img
+              src="/brand/author-community-1.png"
+              alt="BookLeaf author with her published book"
+              className="community-photo photo-one"
+            />
+            <img
+              src="/brand/author-community-3.png"
+              alt="BookLeaf author holding his book"
+              className="community-photo photo-two"
+            />
+            <img
+              src="/brand/author-community-2.jpg"
+              alt="BookLeaf author sharing her published book"
+              className="community-photo photo-three"
+            />
+            <div className="community-caption">
+              <BookOpen size={19} />
+              <span>
+                Real stories.
+                <br />
+                <strong>Extraordinary storytellers.</strong>
+              </span>
+            </div>
           </div>
         </div>
-        <small>BookLeaf Publishing · India & United States</small>
+        <a
+          className="website-link"
+          href="https://www.bookleafpub.in/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Visit BookLeaf Publishing <ArrowUpRight size={15} />
+        </a>
       </section>
       <section className="login-form">
         <div className="login-box">
-          <span className="eyebrow">WELCOME TO BOOKLEAF</span>
-          <h2>A space for your story.</h2>
+          <span className="eyebrow">WELCOME BACK TO BOOKLEAF</span>
+          <h2>Your author workspace.</h2>
           <p>Sign in to your author or operations account.</p>
           <form onSubmit={submit}>
             <label>

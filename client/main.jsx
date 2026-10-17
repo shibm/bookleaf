@@ -16,6 +16,7 @@ import {
 import { api } from './api';
 import { date } from './utils';
 import { Empty } from './components/shared';
+import Brand from './components/Brand';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Books from './pages/Books';
@@ -95,12 +96,7 @@ function App() {
             navigate('/');
           }}
         >
-          <div className="brand-icon">
-            <Leaf size={25} />
-          </div>
-          <div>
-            bookleaf<span>PUBLISHING</span>
-          </div>
+          <Brand />
         </a>
         <div className="workspace">
           {admin ? 'OPERATIONS WORKSPACE' : 'AUTHOR WORKSPACE'}
@@ -206,7 +202,7 @@ function App() {
           )}
         </main>
         <footer>
-          Made for the stories that matter.
+          Publishing made easy. Support for every chapter.
           <span>BookLeaf Publishing · Author Support</span>
         </footer>
       </div>
