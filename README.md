@@ -48,7 +48,7 @@ npm run dev:server
 npm run dev
 ```
 
-Open http://localhost:5173. Vite proxies `/api` and `/health` to the backend. Production needs only `npm run build` followed by `npm start`.
+Open http://localhost:5173. Vite proxies `/api` and `/health` to the backend port set by `PORT` in `.env` (3000 by default). Run only one backend at a time: use either `npm start` or `npm run dev:server`. If you change `PORT`, restart both the backend and Vite. Production needs only `npm run build` followed by `npm start`.
 
 ## Demo accounts
 
@@ -86,9 +86,14 @@ Implementation references: [official OpenAI Structured Outputs documentation](ht
 
 ```text
 client/                 React SPA, API client, responsive styles
-src/app.js              REST endpoints, session auth, RBAC, AI job orchestration
+src/app.js              Express composition and middleware wiring
+src/routes/             Resource routers and endpoint authorization
+src/controllers/        HTTP request/response handling
+src/middleware/         Authentication, CSRF, rate limits and errors
+src/config/             Persistent session configuration
+src/utils/              HTTP errors and shared input validation
 src/db.js               Mongoose schemas, database connection and seed logic
-src/services/           Knowledge base and AI/fallback generation
+src/services/           Ticket workflows, queue queries, AI jobs and knowledge base
 src/server.js           Startup, recovery and graceful shutdown
 scripts/                Repeatable seed and source ZIP packaging
 data/sample-data.json  Exact supplied sample dataset
@@ -109,7 +114,7 @@ npm run build
 npm run test:e2e
 ```
 
-**Verified:** production build, all 11 backend/AI tests, and the Chrome browser conversation workflow (including mobile navigation) pass.
+**Verified:** production build, all 12 backend/AI tests, and the Chrome browser conversation workflow (including mobile navigation) pass.
 
 `npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.js` for the browser setup.
 
