@@ -38,7 +38,14 @@ async function login(email, password) {
 }
 before(async () => {
   mongo = await MongoMemoryServer.create();
-  await connectDatabase(mongo.getUri('bookleaf_test'));
+  // Reproduce a shared Atlas URI with no database and incompatible records in test.
+  const uri = mongo.getUri().replace(/\/[^/?]*(\?.*)?$/, '/');
+  const legacy = await mongoose
+    .createConnection(uri, { dbName: 'test' })
+    .asPromise();
+  await legacy.collection('users').insertMany([{ legacy: 1 }, { legacy: 2 }]);
+  await legacy.close();
+  await connectDatabase(uri);
   await seed();
   app = createApp({ suggestion: async (...args) => fallback(...args) });
   server = app.listen(0, '127.0.0.1');
@@ -53,6 +60,17 @@ after(async () => {
   if (server) await new Promise((r) => server.close(r));
   await mongoose.disconnect();
   if (mongo) await mongo.stop();
+});
+test('an unnamed URI uses bookleaf and preserves the existing test database', async () => {
+  assert.equal(mongoose.connection.name, 'bookleaf');
+  assert.equal(
+    await mongoose.connection
+      .getClient()
+      .db('test')
+      .collection('users')
+      .countDocuments(),
+    2,
+  );
 });
 test('exact data is seeded idempotently and books are isolated', async () => {
   await seed();

@@ -19,6 +19,8 @@ MONGODB_URI=mongodb://127.0.0.1:27017/bookleaf
 # MONGODB_URI=mongodb+srv://USERNAME:PASSWORD@YOUR-CLUSTER.mongodb.net/bookleaf
 ```
 
+When a connection string omits its database name, the app uses `bookleaf` instead of MongoDB’s default `test` database. Set optional `MONGODB_DB_NAME` to override the database explicitly. Existing data in other databases is left untouched.
+
 URL-encode special characters in Atlas credentials and allow your application's IP in Atlas Network Access. Keep the real connection string in `.env`; it is excluded from Git and the source ZIP.
 
 If you want a local MongoDB through Docker:
@@ -107,7 +109,7 @@ npm run build
 npm run test:e2e
 ```
 
-**Verified:** production build, all 10 backend/AI tests, and the Chrome browser conversation workflow (including mobile navigation) pass.
+**Verified:** production build, all 11 backend/AI tests, and the Chrome browser conversation workflow (including mobile navigation) pass.
 
 `npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.js` for the browser setup.
 

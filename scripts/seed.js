@@ -7,6 +7,9 @@ try {
   console.log(
     'Seeded 10 authors, 18 books and 1 admin; existing records retained.',
   );
+} catch (error) {
+  console.error(`Seeding failed: ${error.message}`);
+  process.exitCode = 1;
 } finally {
   await mongoose.disconnect();
 }
