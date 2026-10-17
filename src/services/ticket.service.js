@@ -23,6 +23,7 @@ export async function getTicket(id, user) {
   if (user.role !== 'admin') {
     delete t.draft;
     delete t.ai_reason;
+    delete t.ai_error;
     delete t.assigned_to;
     delete t.assignee_name;
     delete t.ai_state;
@@ -181,7 +182,10 @@ export async function queueDraft(id, user, jobs) {
   if (!jobs.has(t.id)) {
     await Ticket.updateOne(
       { _id: t.id },
-      { $set: { ai_state: 'pending' }, $inc: { version: 1 } },
+      {
+        $set: { ai_state: 'pending', ai_error: null, ai_reason: null },
+        $inc: { version: 1 },
+      },
     );
     jobs.enqueue(t.id);
   }

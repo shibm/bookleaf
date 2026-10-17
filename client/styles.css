@@ -1589,3 +1589,28 @@ td > small {
     padding: 40px 20px;
   }
 }
+
+.ai-error {
+  margin: 20px 24px;
+  padding: 16px;
+  border: 1px solid #e9c8b8;
+  border-radius: 5px;
+  background: #fff5ef;
+  color: #84492e;
+}
+.ai-error strong {
+  font-size: 12px;
+}
+.ai-error p {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 8px 0;
+}
+.ai-error p:last-child {
+  margin-bottom: 0;
+}
+.ai-error small {
+  font-size: 10px;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}

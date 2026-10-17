@@ -80,6 +80,8 @@ Policies cover the 80/20 **net profit** split, quarterly/45-day cycle, ₹1,000 
 
 Cost controls: one initial combined call per query, relevant policy retrieval rather than full history, capped input/output, persisted drafts, per-process job deduplication and rate-limited explicit regeneration. `store:false` disables response storage by the Responses endpoint; external processing still occurs when enabled. The provider timeout defaults to 12 seconds. Errors, rate limits, refusal/incomplete responses and malformed output produce a labeled deterministic fallback. Tickets are saved before AI starts, and manual replies remain available. Pending jobs are recovered on server restart. Human category and priority overrides survive late AI results.
 
+AI provider failures are logged with allowlisted error codes and HTTP status, and stored as admin-only `ai_error` diagnostics on the ticket. The Response assistant shows specific instructions for exhausted credits, quota/spend limits, invalid credentials, rate limiting, timeouts, unavailable models, and provider outages. Raw provider messages, API keys and ticket content are never included in these logs. Authors receive no provider diagnostics, and manual replies remain available. Regeneration clears old diagnostics; successful generation clears the error. Startup, seeding and frontend builds do not call OpenAI, so billing errors appear when a ticket actually attempts AI generation. Previously saved fallback drafts need regeneration to capture a specific failure cause.
+
 Implementation references: [official OpenAI Structured Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses). Live API behavior requires your key and model access; provider success/failure paths are covered with mocked responses.
 
 ## Structure and schema
@@ -115,7 +117,7 @@ npm run build
 npm run test:e2e
 ```
 
-**Verified:** production build, all 12 backend/AI tests, and the Chrome browser conversation workflow (including mobile navigation) pass.
+**Verified:** production build, all 15 backend/AI tests, and both Chrome browser workflows (conversation lifecycle/mobile navigation and admin billing-error visibility) pass.
 
 `npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.js` for the browser setup.
 

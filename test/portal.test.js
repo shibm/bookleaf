@@ -6,8 +6,9 @@ import { connectDatabase } from '../src/config/database.js';
 import { seed } from '../src/database/seed.js';
 import { User, Book, Ticket } from '../src/models/index.js';
 import { createApp } from '../src/app.js';
-import { fallback } from '../src/services/ai.js';
+import { fallback, generateSuggestion } from '../src/services/ai.js';
 let mongo, server, base, app, author, other, admin;
+let aiSuggestion = async (...args) => fallback(...args);
 function client() {
   let cookie = '',
     csrf = '';
@@ -49,7 +50,7 @@ before(async () => {
   await legacy.close();
   await connectDatabase(uri);
   await seed();
-  app = createApp({ suggestion: async (...args) => fallback(...args) });
+  app = createApp({ suggestion: (...args) => aiSuggestion(...args) });
   server = app.listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -298,4 +299,61 @@ test('AI finishing later preserves a human classification override', async () =>
   const updated = await Ticket.findById(t._id).lean();
   assert.equal(updated.category, 'Printing & Quality');
   assert.equal(updated.priority, 'Critical');
+});
+
+test('AI billing failures persist for admins, stay private, and clear on successful regeneration', async () => {
+  const previous = aiSuggestion;
+  const logs = [];
+  try {
+    aiSuggestion = (...args) =>
+      generateSuggestion(...args, {
+        apiKey: 'test-key',
+        logger: { warn: (...entry) => logs.push(entry) },
+        fetchImpl: async () => ({
+          ok: false,
+          status: 429,
+          json: async () => ({
+            error: {
+              code: 'credit_balance_exhausted',
+              message: 'private provider data',
+            },
+          }),
+        }),
+      });
+    const created = await author('/api/tickets', {
+      method: 'POST',
+      body: {
+        subject: 'Royalty payment question',
+        description: 'Please explain the royalty payment schedule.',
+      },
+    });
+    const id = created.data.id;
+    await app.locals.waitForAI();
+    const staff = (await admin(`/api/tickets/${id}`)).data;
+    assert.equal(staff.ai_state, 'fallback');
+    assert.equal(staff.ai_error.code, 'credit_balance_exhausted');
+    assert.match(staff.ai_error.message, /Add credits/);
+    assert.ok(staff.draft);
+    assert.equal(logs.length, 1);
+    const publicTicket = (await author(`/api/tickets/${id}`)).data;
+    assert.equal(publicTicket.ai_error, undefined);
+    assert.ok(
+      !JSON.stringify(publicTicket).includes('credit_balance_exhausted'),
+    );
+    aiSuggestion = async (...args) => ({
+      ...fallback(...args),
+      state: 'ready',
+      error: null,
+    });
+    assert.equal(
+      (await admin(`/api/tickets/${id}/draft`, { method: 'POST' })).status,
+      202,
+    );
+    await app.locals.waitForAI();
+    const recovered = (await admin(`/api/tickets/${id}`)).data;
+    assert.equal(recovered.ai_state, 'ready');
+    assert.equal(recovered.ai_error, null);
+  } finally {
+    aiSuggestion = previous;
+  }
 });

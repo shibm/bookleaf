@@ -1,5 +1,6 @@
 import { User, Book, Ticket } from '../models/index.js';
 import { fallback, generateSuggestion } from './ai.js';
+import { aiDiagnostic, logAiFailure } from './ai-errors.js';
 // Each app instance owns its jobs, preserving dependency injection and isolated tests.
 export function createTicketJobs(suggestion = generateSuggestion) {
   const jobs = new Map();
@@ -16,7 +17,12 @@ export function createTicketJobs(suggestion = generateSuggestion) {
       try {
         result = await suggestion(t, book?.details || null, author.name);
       } catch {
-        result = fallback(t, book?.details || null, author.name);
+        const diagnostic = aiDiagnostic('generation_failed');
+        logAiFailure(diagnostic);
+        result = {
+          ...fallback(t, book?.details || null, author.name),
+          error: diagnostic,
+        };
       }
       // Compare-and-set avoids replacing a human override while a provider call is in flight.
       const changed = await Ticket.updateOne(
@@ -26,6 +32,7 @@ export function createTicketJobs(suggestion = generateSuggestion) {
             draft: result.draft,
             ai_state: result.state,
             ai_reason: result.reason,
+            ai_error: result.error || null,
             category: result.category,
             priority: result.priority,
             updated_at: new Date(),
@@ -41,6 +48,7 @@ export function createTicketJobs(suggestion = generateSuggestion) {
               draft: result.draft,
               ai_state: result.state,
               ai_reason: result.reason,
+              ai_error: result.error || null,
               updated_at: new Date(),
             },
             $inc: { version: 1 },
@@ -48,12 +56,16 @@ export function createTicketJobs(suggestion = generateSuggestion) {
         );
     })()
       .catch(async (error) => {
-        console.error('AI job failed:', error.message);
+        console.error('AI job failed:', {
+          ticketId: id,
+          code: 'generation_failed',
+        });
         await Ticket.updateOne(
           { _id: id },
           {
             $set: {
               ai_state: 'fallback',
+              ai_error: aiDiagnostic('generation_failed'),
               ai_reason:
                 'Suggestion unavailable. Please compose a reply manually.',
             },

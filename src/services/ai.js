@@ -1,5 +1,12 @@
 import { CATEGORIES, PRIORITIES, money } from '../constants.js';
 import { COMMON, POLICIES } from './knowledge.js';
+import {
+  aiDiagnostic,
+  providerDiagnostic,
+  exceptionDiagnostic,
+  aiFailure,
+  logAiFailure,
+} from './ai-errors.js';
 export function fallback(ticket, book, name) {
   const text = `${ticket.subject} ${ticket.description}`.toLowerCase();
   let category = /isbn|metadata|description|bio/.test(text)
@@ -57,10 +64,14 @@ export async function generateSuggestion(
   ticket,
   book,
   name,
-  { apiKey = process.env.OPENAI_API_KEY, fetchImpl = fetch } = {},
+  {
+    apiKey = process.env.OPENAI_API_KEY,
+    fetchImpl = fetch,
+    logger = console,
+  } = {},
 ) {
   const basic = fallback(ticket, book, name);
-  if (!apiKey) return basic;
+  if (!apiKey) return { ...basic, error: aiDiagnostic('not_configured') };
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -100,16 +111,33 @@ export async function generateSuggestion(
         },
       }),
     });
-    if (!response.ok) throw new Error('Provider unavailable');
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw aiFailure(
+        providerDiagnostic(
+          response.status,
+          payload?.error?.code || payload?.error?.type,
+        ),
+      );
+    }
     const result = await response.json();
-    if (result.status !== 'completed') throw new Error('Incomplete output');
-    const raw = result.output
-      ?.flatMap((x) => x.content || [])
-      .filter((x) => x.type === 'output_text')
-      .map((x) => x.text)
+    if (result?.status !== 'completed')
+      throw aiFailure(aiDiagnostic('incomplete_response'));
+    if (!Array.isArray(result.output))
+      throw aiFailure(aiDiagnostic('invalid_response'));
+    const content = result.output.flatMap((item) =>
+      Array.isArray(item?.content) ? item.content : [],
+    );
+    if (content.some((item) => item?.type === 'refusal'))
+      throw aiFailure(aiDiagnostic('response_refused'));
+    const raw = content
+      .filter((item) => item?.type === 'output_text')
+      .map((item) => item.text)
       .join('');
     const parsed = JSON.parse(raw);
     if (
+      !parsed ||
+      typeof parsed !== 'object' ||
       !CATEGORIES.includes(parsed.category) ||
       !PRIORITIES.includes(parsed.priority) ||
       typeof parsed.draft !== 'string' ||
@@ -117,15 +145,17 @@ export async function generateSuggestion(
       parsed.draft.length > 10000 ||
       typeof parsed.reason !== 'string'
     )
-      throw new Error('Invalid output');
+      throw aiFailure(aiDiagnostic('invalid_response'));
     if (
       parsed.category === CATEGORIES[1] &&
       /isbn/i.test(ticket.subject + ' ' + ticket.description) &&
       ['Low', 'Medium'].includes(parsed.priority)
     )
       parsed.priority = 'High';
-    return { ...parsed, state: 'ready' };
-  } catch {
-    return basic;
+    return { ...parsed, state: 'ready', error: null };
+  } catch (error) {
+    const diagnostic = exceptionDiagnostic(error);
+    logAiFailure(diagnostic, logger);
+    return { ...basic, error: diagnostic };
   }
 }

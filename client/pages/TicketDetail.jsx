@@ -187,7 +187,28 @@ export default function TicketDetail({ id, user, navigate, notify }) {
                   Regenerate
                 </button>
               </div>
-              {t.ai_reason && <p className="ai-reason">{t.ai_reason}</p>}
+              {t.ai_state !== 'pending' && t.ai_error && (
+                <div className="ai-error" role="alert">
+                  <strong>AI draft unavailable</strong>
+                  <p>{t.ai_error.message}</p>
+                  <small>
+                    {t.ai_error.code}
+                    {t.ai_error.status ? ` · HTTP ${t.ai_error.status}` : ''}
+                  </small>
+                  <p>
+                    You can use the policy-based draft below or write a reply
+                    manually.
+                  </p>
+                </div>
+              )}
+              {t.ai_state === 'pending' && t.draft && (
+                <p className="ai-reason">
+                  Regenerating. The previous draft remains available below.
+                </p>
+              )}
+              {t.ai_state !== 'pending' && !t.ai_error && t.ai_reason && (
+                <p className="ai-reason">{t.ai_reason}</p>
+              )}
               {t.draft ? (
                 <>
                   <p className="draft-text">{t.draft}</p>

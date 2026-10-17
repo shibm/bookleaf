@@ -8,21 +8,21 @@ All paths below start with `/api`. JSON requests and responses; successful respo
 2. Send that value as `X-CSRF-Token` on every POST/PATCH, including login, and preserve the `bookleaf.sid` cookie.
 3. `POST /auth/login` regenerates the session and returns a **new** CSRF token. Use the new value thereafter.
 
-| Method | Path                    | Access         | Request / result                                                                                      |
-| ------ | ----------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
-| GET    | `/auth/csrf`            | Public         | `{data:{csrfToken}}`                                                                                  |
-| POST   | `/auth/login`           | Public + CSRF  | `{email,password}` → `{data:{user,csrfToken}}`; 30 attempts per 15 minutes per IP                     |
-| GET    | `/auth/me`              | Authenticated  | `{id,name,email,role}`                                                                                |
-| POST   | `/auth/logout`          | Authenticated  | No body; destroys session; 204                                                                        |
-| GET    | `/meta`                 | Authenticated  | Category, priority, status enums                                                                      |
-| GET    | `/dashboard`            | Authenticated  | Scoped conversation counts and aggregate `earned`, `pending` royalty amounts                          |
-| GET    | `/books`                | Authenticated  | Authors: own records; admins: all 18 records; original sample fields plus `author_id`                 |
-| GET    | `/tickets`              | Authenticated  | Scoped, paginated ticket queue; filters below                                                         |
-| POST   | `/tickets`              | Author         | `{book_id:null or "BK001",subject,description}` → 201 ticket; background AI begins after persistence  |
-| GET    | `/tickets/:id`          | Owner or admin | Ticket details and messages; authors never receive internal notes, AI drafts/rationale, or assignment |
-| PATCH  | `/tickets/:id`          | Admin          | `{version,status?,category?,priority?,assigned_to?}` → updated ticket; at least one change required   |
-| POST   | `/tickets/:id/messages` | Owner or admin | `{body,internal?:false}` → 201; only admins may set `internal:true`                                   |
-| POST   | `/tickets/:id/draft`    | Admin          | No body; queues generation/regeneration; 202; 10 per minute per IP                                    |
+| Method | Path                    | Access         | Request / result                                                                                                            |
+| ------ | ----------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/auth/csrf`            | Public         | `{data:{csrfToken}}`                                                                                                        |
+| POST   | `/auth/login`           | Public + CSRF  | `{email,password}` → `{data:{user,csrfToken}}`; 30 attempts per 15 minutes per IP                                           |
+| GET    | `/auth/me`              | Authenticated  | `{id,name,email,role}`                                                                                                      |
+| POST   | `/auth/logout`          | Authenticated  | No body; destroys session; 204                                                                                              |
+| GET    | `/meta`                 | Authenticated  | Category, priority, status enums                                                                                            |
+| GET    | `/dashboard`            | Authenticated  | Scoped conversation counts and aggregate `earned`, `pending` royalty amounts                                                |
+| GET    | `/books`                | Authenticated  | Authors: own records; admins: all 18 records; original sample fields plus `author_id`                                       |
+| GET    | `/tickets`              | Authenticated  | Scoped, paginated ticket queue; filters below                                                                               |
+| POST   | `/tickets`              | Author         | `{book_id:null or "BK001",subject,description}` → 201 ticket; background AI begins after persistence                        |
+| GET    | `/tickets/:id`          | Owner or admin | Ticket details and messages; authors never receive internal notes, AI drafts/rationale, provider diagnostics, or assignment |
+| PATCH  | `/tickets/:id`          | Admin          | `{version,status?,category?,priority?,assigned_to?}` → updated ticket; at least one change required                         |
+| POST   | `/tickets/:id/messages` | Owner or admin | `{body,internal?:false}` → 201; only admins may set `internal:true`                                                         |
+| POST   | `/tickets/:id/draft`    | Admin          | No body; queues generation/regeneration; 202; 10 per minute per IP                                                          |
 
 `GET /health` is outside `/api`: 200 `{status:"ok"}` when MongoDB is connected, otherwise 503.
 
@@ -75,3 +75,7 @@ curl -b cookies.txt -H 'Content-Type: application/json' \
 ```
 
 Keep cookie files out of source control.
+
+### AI failure diagnostics
+
+Admin ticket responses include nullable `ai_error: {code, status, message}`. These fields use allowlisted codes and application-owned messages; raw provider payloads are never forwarded. Authors never receive `ai_error`. A provider failure sets `ai_state` to `fallback`, persists the diagnostic, and retains a policy-based draft. It does not fail ticket creation or manual responses. Regeneration sets the state to `pending` and clears the old diagnostic; success sets `ready` with `ai_error: null`. Existing historical fallback drafts need regeneration to determine the current provider failure.

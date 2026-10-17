@@ -115,3 +115,57 @@ test('author and admin complete a conversation with live updates and private not
   expect(errors).toEqual([]);
   await context.close();
 });
+
+test('billing failure is actionable for admins and never shown to authors', async ({
+  browser,
+  page,
+}) => {
+  await login(page, 'priya.sharma@email.com', 'AuthorDemo!2026');
+  await page.getByRole('button', { name: 'New support query' }).click();
+  await page
+    .getByLabel('Subject', { exact: true })
+    .fill('AI billing diagnostics');
+  await page
+    .getByLabel('Tell us a little more')
+    .fill('Please explain how my royalty payments are scheduled.');
+  await page.getByRole('button', { name: 'Send support query' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'AI billing diagnostics' }),
+  ).toBeVisible();
+  const ticketPath = new URL(page.url()).pathname;
+  const context = await browser.newContext();
+  const staff = await context.newPage();
+  try {
+    await login(staff, 'admin@bookleaf.com', 'AdminDemo!2026');
+    await staff.goto(ticketPath);
+    const banner = staff
+      .getByRole('alert')
+      .filter({ hasText: 'AI draft unavailable' });
+    await expect(banner).toContainText(
+      'OpenAI API credit balance is exhausted',
+    );
+    await expect(banner).toContainText('Add credits in OpenAI Billing');
+    await expect(banner).toContainText('credit_balance_exhausted · HTTP 429');
+    await expect(
+      staff.getByRole('button', { name: 'Regenerate', exact: true }),
+    ).toBeEnabled();
+    await expect(
+      staff.getByText('Preparing a suggestion…', { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText('OpenAI API credit balance is exhausted', {
+        exact: false,
+      }),
+    ).toHaveCount(0);
+    await staff.getByRole('button', { name: 'Use draft' }).click();
+    await expect(
+      staff.getByRole('textbox', { name: 'Reply', exact: true }),
+    ).not.toBeEmpty();
+    await staff.screenshot({
+      path: 'artifacts/ai-billing-error.png',
+      fullPage: true,
+    });
+  } finally {
+    await context.close();
+  }
+});

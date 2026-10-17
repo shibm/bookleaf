@@ -18,6 +18,13 @@ const ticketSchema = new mongoose.Schema(
     },
     draft: { type: String, default: '' },
     ai_reason: String,
+    ai_error: {
+      type: new mongoose.Schema(
+        { code: String, status: Number, message: String },
+        { _id: false },
+      ),
+      default: null,
+    },
     version: { type: Number, default: 1 },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
