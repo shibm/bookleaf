@@ -18,7 +18,10 @@ export function createSessionMiddleware(sessionStore) {
       sessionStore ||
       MongoStore.create({
         client: mongoose.connection.getClient(),
+        dbName: mongoose.connection.name,
         collectionName: 'sessions',
+        // MongoDB's TTL index is created and awaited in connectDatabase().
+        autoRemove: 'disabled',
       }),
     resave: false,
     saveUninitialized: false,

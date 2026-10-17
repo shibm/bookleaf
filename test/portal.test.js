@@ -66,6 +66,23 @@ after(async () => {
 });
 test('an unnamed URI uses bookleaf and preserves the existing test database', async () => {
   assert.equal(mongoose.connection.name, 'bookleaf');
+  assert.ok(
+    (await mongoose.connection.collection('sessions').countDocuments()) >= 3,
+  );
+  assert.equal(
+    await mongoose.connection
+      .getClient()
+      .db('test')
+      .collection('sessions')
+      .countDocuments(),
+    0,
+  );
+  const indexes = await mongoose.connection.collection('sessions').indexes();
+  assert.ok(
+    indexes.some(
+      (index) => index.key.expires === 1 && index.expireAfterSeconds === 0,
+    ),
+  );
   assert.equal(
     await mongoose.connection
       .getClient()

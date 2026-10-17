@@ -16,5 +16,10 @@ export async function connectDatabase(uri = process.env.MONGODB_URI) {
     ...(dbName ? { dbName } : {}),
   });
   await Promise.all([User.init(), Book.init(), Ticket.init(), Message.init()]);
+  // Finish session index setup before constructing the app or accepting requests.
+  // connect-mongo otherwise creates this index in an unawaited background promise.
+  await mongoose.connection
+    .collection('sessions')
+    .createIndex({ expires: 1 }, { expireAfterSeconds: 0 });
   return mongoose.connection;
 }

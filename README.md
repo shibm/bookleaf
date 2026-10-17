@@ -60,7 +60,7 @@ Nodemon is configured in `nodemon.json`:
 - Generated builds, dependencies, archives and test output do not trigger backend restarts.
 - Type `rs` and press Enter in the Nodemon terminal to request a manual restart. Press Ctrl+C to stop it.
 
-Run only one backend at a time: stop an existing `npm start` or older watcher once before switching to `npm run dev:server`. After that, leave Nodemon running while you edit. React changes update through Vite. If you change `PORT`, restart Vite so its proxy uses the new backend port.
+Run only one backend at a time: stop an existing `npm start` or older watcher once before switching to `npm run dev:server`. After that, leave Nodemon running while you edit. If a duplicate startup reports that the port is already in use, keep the working backend and stop the extra watcher. Startup waits for database/session indexes before serving requests, and a failed bind exits without starting AI recovery. React changes update through Vite. If you change `PORT`, restart Vite so its proxy uses the new backend port.
 
 For a production-style run, use `npm run build` followed by `npm start`; this serves the built React app and does not enable automatic restarts.
 
@@ -131,7 +131,7 @@ npm run build
 npm run test:e2e
 ```
 
-**Verified:** production build, all 15 backend/AI tests, and both Chrome browser workflows (conversation lifecycle/mobile navigation and admin billing-error visibility) pass.
+**Verified:** production build, all 16 backend/AI tests, and both Chrome browser workflows (conversation lifecycle/mobile navigation and admin billing-error visibility) pass.
 
 `npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.js` for the browser setup.
 
