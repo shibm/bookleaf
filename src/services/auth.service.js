@@ -1,4 +1,5 @@
-import { User, verifyPassword, hashPassword } from '../db.js';
+import { User } from '../models/index.js';
+import { verifyPassword, hashPassword } from '../utils/password.js';
 import { failure } from '../utils/http-error.js';
 import { text } from '../utils/validation.js';
 

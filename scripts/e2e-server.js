@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { connectDatabase, seed } from '../src/db.js';
+import { connectDatabase } from '../src/config/database.js';
+import { seed } from '../src/database/seed.js';
 import { createApp } from '../src/app.js';
 import { fallback } from '../src/services/ai.js';
 process.env.NODE_ENV = 'test';

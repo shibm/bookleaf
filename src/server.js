@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
-import { connectDatabase, seed } from './db.js';
+import { connectDatabase } from './config/database.js';
+import { seed } from './database/seed.js';
 import { createApp } from './app.js';
 import { listen } from './listen.js';
 try {

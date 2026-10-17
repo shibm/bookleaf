@@ -1,4 +1,4 @@
-import { Book, Ticket } from '../db.js';
+import { Book, Ticket } from '../models/index.js';
 export async function getDashboard(user) {
   const filter = user.role === 'author' ? { author_id: user._id } : {};
   const [total, unresolved, urgent, resolved, books] = await Promise.all([

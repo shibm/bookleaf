@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { User, Book, Ticket, Message } from '../db.js';
+import { User, Book, Ticket, Message } from '../models/index.js';
 import { CATEGORIES, PRIORITIES, STATUSES } from '../constants.js';
 import { fallback } from './ai.js';
 import { failure } from '../utils/http-error.js';

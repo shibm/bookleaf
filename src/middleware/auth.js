@@ -1,4 +1,4 @@
-import { User } from '../db.js';
+import { User } from '../models/index.js';
 import { failure } from '../utils/http-error.js';
 export async function loadUser(req, _res, next) {
   if (req.session.userId)

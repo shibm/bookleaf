@@ -90,9 +90,10 @@ src/app.js              Express composition and middleware wiring
 src/routes/             Resource routers and endpoint authorization
 src/controllers/        HTTP request/response handling
 src/middleware/         Authentication, CSRF, rate limits and errors
-src/config/             Persistent session configuration
-src/utils/              HTTP errors and shared input validation
-src/db.js               Mongoose schemas, database connection and seed logic
+src/config/             Database connection and persistent session configuration
+src/utils/              Password hashing, HTTP errors and input validation
+src/models/             Separate User, Book, Ticket and Message schemas/indexes
+src/database/           Idempotent demo seeding
 src/services/           Ticket workflows, queue queries, AI jobs and knowledge base
 src/server.js           Startup, recovery and graceful shutdown
 scripts/                Repeatable seed and source ZIP packaging

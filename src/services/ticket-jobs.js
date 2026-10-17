@@ -1,4 +1,4 @@
-import { User, Book, Ticket } from '../db.js';
+import { User, Book, Ticket } from '../models/index.js';
 import { fallback, generateSuggestion } from './ai.js';
 // Each app instance owns its jobs, preserving dependency injection and isolated tests.
 export function createTicketJobs(suggestion = generateSuggestion) {
