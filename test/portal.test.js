@@ -1,0 +1,281 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { connectDatabase, seed, User, Book, Ticket } from '../src/db.js';
+import { createApp } from '../src/app.js';
+import { fallback } from '../src/services/ai.js';
+let mongo, server, base, app, author, other, admin;
+function client() {
+  let cookie = '',
+    csrf = '';
+  return async (path, { method = 'GET', body, token = true } = {}) => {
+    const r = await fetch(base + path, {
+      method,
+      headers: {
+        cookie,
+        'Content-Type': 'application/json',
+        ...(token ? { 'X-CSRF-Token': csrf } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const c = r.headers.getSetCookie();
+    if (c.length) cookie = c.map((s) => s.split(';')[0]).join('; ');
+    const result = r.status === 204 ? null : await r.json();
+    if (result?.data?.csrfToken) csrf = result.data.csrfToken;
+    return { status: r.status, ...result };
+  };
+}
+async function login(email, password) {
+  const c = client();
+  await c('/api/auth/csrf');
+  assert.equal(
+    (await c('/api/auth/login', { method: 'POST', body: { email, password } }))
+      .status,
+    200,
+  );
+  return c;
+}
+before(async () => {
+  mongo = await MongoMemoryServer.create();
+  await connectDatabase(mongo.getUri('bookleaf_test'));
+  await seed();
+  app = createApp({ suggestion: async (...args) => fallback(...args) });
+  server = app.listen(0, '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  base = `http://127.0.0.1:${server.address().port}`;
+  author = await login('priya.sharma@email.com', 'AuthorDemo!2026');
+  other = await login('rohit.kapoor@email.com', 'AuthorDemo!2026');
+  admin = await login('admin@bookleaf.com', 'AdminDemo!2026');
+});
+after(async () => {
+  if (app) await app.locals.waitForAI();
+  if (server) await new Promise((r) => server.close(r));
+  await mongoose.disconnect();
+  if (mongo) await mongo.stop();
+});
+test('exact data is seeded idempotently and books are isolated', async () => {
+  await seed();
+  assert.equal(await User.countDocuments(), 11);
+  assert.equal(await Book.countDocuments(), 18);
+  const r = await author('/api/books');
+  assert.equal(r.data.length, 2);
+  assert.equal(r.data[0].book_id, 'BK001');
+  assert.equal(r.data[0].royalty_pending, 3570);
+  assert.equal((await admin('/api/books')).data.length, 18);
+});
+test('authentication, CSRF, input validation, and roles are enforced', async () => {
+  const guest = client();
+  assert.equal((await guest('/api/books')).status, 401);
+  await guest('/api/auth/csrf');
+  assert.equal(
+    (
+      await guest('/api/auth/login', {
+        method: 'POST',
+        body: { email: 'x@email.com', password: 'wrong' },
+      })
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await author('/api/tickets', { method: 'POST', token: false, body: {} }))
+      .status,
+    403,
+  );
+  assert.equal(
+    (
+      await author('/api/tickets', {
+        method: 'POST',
+        body: { subject: 'Hi', description: 'tiny' },
+      })
+    ).status,
+    422,
+  );
+  assert.equal(
+    (
+      await author('/api/tickets', {
+        method: 'POST',
+        body: {
+          book_id: 'BK003',
+          subject: 'Wrong book',
+          description: 'This is not my book.',
+        },
+      })
+    ).status,
+    422,
+  );
+  assert.equal((await author('/api/tickets?from=2026-02-31')).status, 422);
+  assert.equal((await author('/api/tickets?page=-1')).status, 422);
+  assert.equal(
+    (
+      await admin('/api/tickets', {
+        method: 'POST',
+        body: {
+          subject: 'Admin request',
+          description: 'This is an admin query',
+        },
+      })
+    ).status,
+    403,
+  );
+});
+test('full ticket lifecycle protects private notes and permits manual replies', async () => {
+  const created = await author('/api/tickets', {
+    method: 'POST',
+    body: {
+      book_id: 'BK001',
+      subject: 'Royalty overdue for 6 months',
+      description: 'I have not received my pending royalty. Please check.',
+    },
+  });
+  assert.equal(created.status, 201);
+  const id = created.data.id;
+  await app.locals.waitForAI();
+  assert.equal((await other(`/api/tickets/${id}`)).status, 404);
+  assert.equal(
+    (
+      await author(`/api/tickets/${id}`, {
+        method: 'PATCH',
+        body: { status: 'Closed', version: 1 },
+      })
+    ).status,
+    403,
+  );
+  let t = (await admin(`/api/tickets/${id}`)).data;
+  assert.equal(t.priority, 'High');
+  assert.equal(t.ai_state, 'fallback');
+  assert.ok(t.draft);
+  let r = await admin(`/api/tickets/${id}`, {
+    method: 'PATCH',
+    body: {
+      version: t.version,
+      status: 'In Progress',
+      assigned_to: 'ADMIN001',
+      category: 'General Inquiry',
+      priority: 'Medium',
+    },
+  });
+  assert.equal(r.status, 200);
+  assert.equal(
+    (
+      await admin(`/api/tickets/${id}`, {
+        method: 'PATCH',
+        body: { version: t.version, status: 'Resolved' },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await admin(`/api/tickets/${id}/messages`, {
+        method: 'POST',
+        body: { body: 'PRIVATE team note', internal: true },
+      })
+    ).status,
+    201,
+  );
+  assert.equal(
+    (
+      await author(`/api/tickets/${id}/messages`, {
+        method: 'POST',
+        body: { body: 'My hidden message', internal: true },
+      })
+    ).status,
+    403,
+  );
+  await admin(`/api/tickets/${id}/messages`, {
+    method: 'POST',
+    body: {
+      body: 'Please confirm your bank account is linked.',
+      internal: false,
+    },
+  });
+  let visible = (await author(`/api/tickets/${id}`)).data;
+  assert.equal(visible.messages.length, 1);
+  assert.ok(!JSON.stringify(visible).includes('PRIVATE'));
+  assert.equal(visible.draft, undefined);
+  assert.equal(visible.ai_reason, undefined);
+  assert.equal(visible.status, 'In Progress');
+  assert.equal(
+    visible.messages[0].body,
+    'Please confirm your bank account is linked.',
+  );
+  t = (await admin(`/api/tickets/${id}`)).data;
+  assert.equal(t.messages.length, 2);
+  await admin(`/api/tickets/${id}`, {
+    method: 'PATCH',
+    body: { version: t.version, status: 'Resolved' },
+  });
+  await author(`/api/tickets/${id}/messages`, {
+    method: 'POST',
+    body: { body: 'I still need some help with this.' },
+  });
+  assert.equal((await admin(`/api/tickets/${id}`)).data.status, 'Open');
+  t = (await admin(`/api/tickets/${id}`)).data;
+  await admin(`/api/tickets/${id}`, {
+    method: 'PATCH',
+    body: { version: t.version, status: 'Closed' },
+  });
+  assert.equal(
+    (
+      await author(`/api/tickets/${id}/messages`, {
+        method: 'POST',
+        body: { body: 'This should be rejected.' },
+      })
+    ).status,
+    422,
+  );
+});
+test('queue filters and dashboard counts work', async () => {
+  const r = await other('/api/tickets', {
+    method: 'POST',
+    body: {
+      subject: 'Wrong ISBN listing',
+      description: 'My ISBN is linked to a different book on Amazon.',
+    },
+  });
+  await app.locals.waitForAI();
+  const queue = await admin('/api/tickets?priority=High&status=Open');
+  assert.ok(queue.data.some((t) => t.id === r.data.id));
+  assert.ok(
+    !(await author('/api/tickets')).data.some((t) => t.id === r.data.id),
+  );
+  const s = await author('/api/dashboard');
+  assert.equal(s.data.earned, 19908);
+  assert.equal(s.data.pending, 3570);
+  assert.equal((await author('/api/tickets/not-an-id')).status, 404);
+});
+test('AI finishing later preserves a human classification override', async () => {
+  const t = await Ticket.create({
+    author_id: 'AUTH001',
+    subject: 'A pending query',
+    description: 'A pending query for testing recovery.',
+    category: 'General Inquiry',
+    priority: 'Low',
+  });
+  let release;
+  const gate = new Promise((r) => (release = r));
+  let started;
+  const ready = new Promise((r) => (started = r));
+  const slow = createApp({
+    suggestion: async (...args) => {
+      started();
+      await gate;
+      return fallback(...args);
+    },
+  });
+  await slow.locals.recoverAI();
+  await ready;
+  await Ticket.updateOne(
+    { _id: t._id },
+    {
+      $set: { category: 'Printing & Quality', priority: 'Critical' },
+      $inc: { version: 1 },
+    },
+  );
+  release();
+  await slow.locals.waitForAI();
+  const updated = await Ticket.findById(t._id).lean();
+  assert.equal(updated.category, 'Printing & Quality');
+  assert.equal(updated.priority, 'Critical');
+});
