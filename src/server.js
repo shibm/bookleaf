@@ -2,16 +2,14 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import { connectDatabase, seed } from './db.js';
 import { createApp } from './app.js';
+import { listen } from './listen.js';
 try {
   await connectDatabase();
   if (process.env.SEED_DEMO === 'true') await seed();
   const app = createApp();
   await app.locals.recoverAI();
-  const server = app.listen(Number(process.env.PORT) || 3000, () =>
-    console.log(
-      `BookLeaf running at http://localhost:${server.address().port}`,
-    ),
-  );
+  const server = await listen(app, Number(process.env.PORT) || 3000);
+  console.log(`BookLeaf running at http://localhost:${server.address().port}`);
   function shutdown() {
     server.close(async () => {
       await app.locals.waitForAI();
@@ -22,7 +20,11 @@ try {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 } catch (error) {
-  console.error(error.message);
+  console.error(
+    error.code === 'EADDRINUSE'
+      ? `Port ${process.env.PORT || 3000} is already in use. Stop the existing backend before starting another, or set a different PORT in .env.`
+      : error.message,
+  );
   await mongoose.disconnect();
   process.exit(1);
 }
