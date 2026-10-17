@@ -170,6 +170,9 @@ export default function TicketDetail({ id, user, navigate, notify }) {
                         ? 'Preparing a suggestion…'
                         : 'Policy-based fallback · AI not available'}
                   </p>
+                  {t.ai_state !== 'pending' && t.ai_provider && (
+                    <small className="ai-provider">Gemini · {t.ai_model}</small>
+                  )}
                 </div>
                 <button
                   className="text-button"

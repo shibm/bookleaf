@@ -1,4 +1,5 @@
 import { User, Book, Ticket } from '../models/index.js';
+import { getAiConfig } from '../config/ai.js';
 import { fallback, generateSuggestion } from './ai.js';
 import { aiDiagnostic, logAiFailure } from './ai-errors.js';
 // Each app instance owns its jobs, preserving dependency injection and isolated tests.
@@ -17,10 +18,13 @@ export function createTicketJobs(suggestion = generateSuggestion) {
       try {
         result = await suggestion(t, book?.details || null, author.name);
       } catch {
-        const diagnostic = aiDiagnostic('generation_failed');
+        const { provider, model } = getAiConfig();
+        const diagnostic = aiDiagnostic('generation_failed', null, provider);
         logAiFailure(diagnostic);
         result = {
           ...fallback(t, book?.details || null, author.name),
+          provider,
+          model: model || null,
           error: diagnostic,
         };
       }
@@ -33,6 +37,8 @@ export function createTicketJobs(suggestion = generateSuggestion) {
             ai_state: result.state,
             ai_reason: result.reason,
             ai_error: result.error || null,
+            ai_provider: result.provider || null,
+            ai_model: result.model || null,
             category: result.category,
             priority: result.priority,
             updated_at: new Date(),
@@ -49,6 +55,8 @@ export function createTicketJobs(suggestion = generateSuggestion) {
               ai_state: result.state,
               ai_reason: result.reason,
               ai_error: result.error || null,
+              ai_provider: result.provider || null,
+              ai_model: result.model || null,
               updated_at: new Date(),
             },
             $inc: { version: 1 },
@@ -65,7 +73,11 @@ export function createTicketJobs(suggestion = generateSuggestion) {
           {
             $set: {
               ai_state: 'fallback',
-              ai_error: aiDiagnostic('generation_failed'),
+              ai_error: aiDiagnostic(
+                'generation_failed',
+                null,
+                getAiConfig().provider,
+              ),
               ai_reason:
                 'Suggestion unavailable. Please compose a reply manually.',
             },

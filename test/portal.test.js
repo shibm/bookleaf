@@ -318,12 +318,13 @@ test('AI finishing later preserves a human classification override', async () =>
   assert.equal(updated.priority, 'Critical');
 });
 
-test('AI billing failures persist for admins, stay private, and clear on successful regeneration', async () => {
+test('Gemini quota failures persist for admins, stay private, and clear on successful regeneration', async () => {
   const previous = aiSuggestion;
   const logs = [];
   try {
     aiSuggestion = (...args) =>
       generateSuggestion(...args, {
+        provider: 'gemini',
         apiKey: 'test-key',
         logger: { warn: (...entry) => logs.push(entry) },
         fetchImpl: async () => ({
@@ -331,7 +332,7 @@ test('AI billing failures persist for admins, stay private, and clear on success
           status: 429,
           json: async () => ({
             error: {
-              code: 'credit_balance_exhausted',
+              status: 'RESOURCE_EXHAUSTED',
               message: 'private provider data',
             },
           }),
@@ -348,15 +349,13 @@ test('AI billing failures persist for admins, stay private, and clear on success
     await app.locals.waitForAI();
     const staff = (await admin(`/api/tickets/${id}`)).data;
     assert.equal(staff.ai_state, 'fallback');
-    assert.equal(staff.ai_error.code, 'credit_balance_exhausted');
-    assert.match(staff.ai_error.message, /Add credits/);
+    assert.equal(staff.ai_error.code, 'quota_exceeded');
+    assert.match(staff.ai_error.message, /Google AI Studio/);
     assert.ok(staff.draft);
     assert.equal(logs.length, 1);
     const publicTicket = (await author(`/api/tickets/${id}`)).data;
     assert.equal(publicTicket.ai_error, undefined);
-    assert.ok(
-      !JSON.stringify(publicTicket).includes('credit_balance_exhausted'),
-    );
+    assert.ok(!JSON.stringify(publicTicket).includes('quota_exceeded'));
     aiSuggestion = async (...args) => ({
       ...fallback(...args),
       state: 'ready',
@@ -370,6 +369,89 @@ test('AI billing failures persist for admins, stay private, and clear on success
     const recovered = (await admin(`/api/tickets/${id}`)).data;
     assert.equal(recovered.ai_state, 'ready');
     assert.equal(recovered.ai_error, null);
+  } finally {
+    aiSuggestion = previous;
+  }
+});
+
+test('retired provider diagnostics are replaced and regeneration saves Gemini metadata', async () => {
+  const previous = aiSuggestion;
+  try {
+    const created = await author('/api/tickets', {
+      method: 'POST',
+      body: {
+        subject: 'Historical draft',
+        description: 'Please explain my royalty payment schedule.',
+      },
+    });
+    await app.locals.waitForAI();
+    const id = created.data.id;
+    await Ticket.collection.updateOne(
+      { _id: new mongoose.Types.ObjectId(id) },
+      {
+        $set: {
+          ai_provider: 'retired-provider',
+          ai_model: 'retired-model',
+          ai_error: {
+            provider: 'retired-provider',
+            message: 'Obsolete billing error',
+            code: 'old_error',
+          },
+        },
+      },
+    );
+    const staff = (await admin(`/api/tickets/${id}`)).data;
+    assert.equal(staff.ai_error.code, 'regeneration_required');
+    assert.equal(staff.ai_provider, null);
+    assert.equal(staff.ai_model, null);
+    assert.ok(!JSON.stringify(staff).includes('Obsolete billing error'));
+    const publicTicket = (await author(`/api/tickets/${id}`)).data;
+    for (const key of [
+      'ai_provider',
+      'ai_model',
+      'ai_error',
+      'draft',
+      'ai_reason',
+    ])
+      assert.equal(publicTicket[key], undefined);
+    aiSuggestion = (...args) =>
+      generateSuggestion(...args, {
+        apiKey: 'mock-key',
+        model: 'gemini-test-model',
+        logger: { warn() {} },
+        fetchImpl: async () => ({
+          ok: true,
+          json: async () => ({
+            candidates: [
+              {
+                finishReason: 'STOP',
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        category: 'Royalty & Payments',
+                        priority: 'Medium',
+                        draft: 'We will review your royalty payment schedule.',
+                        reason: 'Royalty question.',
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        }),
+      });
+    assert.equal(
+      (await admin(`/api/tickets/${id}/draft`, { method: 'POST' })).status,
+      202,
+    );
+    await app.locals.waitForAI();
+    const regenerated = (await admin(`/api/tickets/${id}`)).data;
+    assert.equal(regenerated.ai_provider, 'gemini');
+    assert.equal(regenerated.ai_model, 'gemini-test-model');
+    assert.equal(regenerated.ai_state, 'ready');
+    assert.equal(regenerated.ai_error, null);
   } finally {
     aiSuggestion = previous;
   }

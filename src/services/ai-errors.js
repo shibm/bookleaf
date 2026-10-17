@@ -1,65 +1,79 @@
 // Only allowlisted codes and application-owned messages reach logs or the admin UI.
 // Provider messages can echo API keys or request data, so never forward them.
 const messages = {
+  regeneration_required:
+    'This saved draft used a retired AI configuration. Click Regenerate to create a new draft with Gemini.',
+  quota_exceeded:
+    'Gemini quota or rate limit reached. Check the model free-tier limits and project quota in Google AI Studio, or try again later.',
+  billing_required:
+    'Gemini requires billing for this request. Check the selected model and project billing settings in Google AI Studio.',
   not_configured:
-    'AI is not configured. Add OPENAI_API_KEY to the backend environment.',
-  credit_balance_exhausted:
-    'OpenAI API credit balance is exhausted. Add credits in OpenAI Billing, then regenerate the draft.',
-  insufficient_quota:
-    'OpenAI API quota is unavailable. Check credits and usage limits in OpenAI Billing, then regenerate the draft.',
-  organization_spend_limit_exceeded:
-    'The OpenAI organization spend limit has been reached. Update the billing limit before regenerating.',
-  project_spend_limit_exceeded:
-    'The OpenAI project spend limit has been reached. Update the project billing limit before regenerating.',
-  organization_usage_limit_exceeded:
-    'The OpenAI organization usage limit has been reached. Review the account usage limit before regenerating.',
+    'AI is not configured. Add GEMINI_API_KEY to the backend environment.',
   invalid_api_key:
-    'OpenAI rejected the API credentials. Check OPENAI_API_KEY in the backend environment and restart the backend.',
+    'Gemini rejected the API credentials. Check GEMINI_API_KEY in the backend environment and restart the backend.',
   access_denied:
-    'OpenAI denied access. Check the project permissions and model access for this API key.',
+    'Gemini denied access. Check the project permissions and model access for this API key.',
   model_not_found:
-    'The configured OpenAI model is unavailable to this project. Check OPENAI_MODEL and model access.',
+    'The configured Gemini model is unavailable to this project. Check GEMINI_MODEL and model access.',
   rate_limit_exceeded:
-    'OpenAI is temporarily rate limiting requests. Wait briefly before regenerating the draft.',
+    'Gemini is temporarily rate limiting requests. Wait briefly before regenerating the draft.',
   provider_unavailable:
-    'OpenAI is temporarily unavailable. Try regenerating the draft later.',
+    'Gemini is temporarily unavailable. Try regenerating the draft later.',
   request_rejected:
-    'OpenAI rejected the request. Check the backend model configuration.',
-  timeout: 'The OpenAI request timed out. Try regenerating the draft.',
+    'Gemini rejected the request. Check the backend model configuration.',
+  timeout: 'The Gemini request timed out. Try regenerating the draft.',
   connection_failed:
-    'The backend could not reach OpenAI. Check its network connection and try again.',
+    'The backend could not reach Gemini. Check its network connection and try again.',
   response_refused:
-    'OpenAI declined to generate this response. Write a manual reply or revise the query.',
+    'Gemini declined to generate this response. Write a manual reply or revise the query.',
   incomplete_response:
-    'OpenAI returned an incomplete response. Try regenerating or write a manual reply.',
+    'Gemini returned an incomplete response. Try regenerating or write a manual reply.',
   invalid_response:
-    'OpenAI returned an invalid response. Try regenerating or write a manual reply.',
+    'Gemini returned an invalid response. Try regenerating or write a manual reply.',
   generation_failed:
     'AI draft generation failed. Try regenerating or write a manual reply.',
 };
 
-export function aiDiagnostic(code, status = null) {
+export function aiDiagnostic(code, status = null, provider = 'gemini') {
   const safeCode = Object.hasOwn(messages, code) ? code : 'generation_failed';
-  return { code: safeCode, status, message: messages[safeCode] };
+  return { code: safeCode, status, provider, message: messages[safeCode] };
 }
 
-export function providerDiagnostic(status, code) {
-  if (Object.hasOwn(messages, code)) return aiDiagnostic(code, status);
-  if (status === 401) return aiDiagnostic('invalid_api_key', status);
-  if (status === 403) return aiDiagnostic('access_denied', status);
-  if (status === 404) return aiDiagnostic('model_not_found', status);
-  if (status === 429) return aiDiagnostic('rate_limit_exceeded', status);
-  if (status >= 500) return aiDiagnostic('provider_unavailable', status);
-  return aiDiagnostic('request_rejected', status);
+export function providerDiagnostic(status, code, provider = 'gemini') {
+  if (Object.hasOwn(messages, code))
+    return aiDiagnostic(code, status, provider);
+  if (status === 401) return aiDiagnostic('invalid_api_key', status, provider);
+  if (status === 403) return aiDiagnostic('access_denied', status, provider);
+  if (status === 404) return aiDiagnostic('model_not_found', status, provider);
+  if (status === 429)
+    return aiDiagnostic('rate_limit_exceeded', status, provider);
+  if (status >= 500)
+    return aiDiagnostic('provider_unavailable', status, provider);
+  return aiDiagnostic('request_rejected', status, provider);
 }
 
-export function exceptionDiagnostic(error) {
+export function geminiDiagnostic(status, payload) {
+  const reasons = Array.isArray(payload?.error?.details)
+    ? payload.error.details.map((detail) => detail?.reason)
+    : [];
+  if (reasons.includes('API_KEY_INVALID') || status === 401)
+    return aiDiagnostic('invalid_api_key', status, 'gemini');
+  if (status === 402 || reasons.includes('BILLING_DISABLED'))
+    return aiDiagnostic('billing_required', status, 'gemini');
+  if (status === 429 || payload?.error?.status === 'RESOURCE_EXHAUSTED')
+    return aiDiagnostic('quota_exceeded', status, 'gemini');
+  return providerDiagnostic(status, null, 'gemini');
+}
+
+export function exceptionDiagnostic(error, provider = 'gemini') {
   if (error?.aiDiagnostic) return error.aiDiagnostic;
   if (['AbortError', 'TimeoutError'].includes(error?.name))
-    return aiDiagnostic('timeout');
-  if (error instanceof SyntaxError) return aiDiagnostic('invalid_response');
-  if (error instanceof TypeError) return aiDiagnostic('connection_failed');
-  return aiDiagnostic('generation_failed');
+    return aiDiagnostic('timeout', null, provider);
+  if (error instanceof SyntaxError)
+    return aiDiagnostic('invalid_response', null, provider);
+  if (error instanceof TypeError)
+    return aiDiagnostic('connection_failed', null, provider);
+  return aiDiagnostic('generation_failed', null, provider);
 }
 
 export function aiFailure(diagnostic) {
@@ -70,7 +84,7 @@ export function aiFailure(diagnostic) {
 
 export function logAiFailure(diagnostic, logger = console) {
   logger.warn('AI response generation failed', {
-    provider: 'openai',
+    provider: diagnostic.provider,
     code: diagnostic.code,
     status: diagnostic.status,
     message: diagnostic.message,

@@ -1763,3 +1763,11 @@ td > small {
     gap: 12px;
   }
 }
+
+.ai-provider {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}

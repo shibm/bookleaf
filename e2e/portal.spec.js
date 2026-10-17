@@ -142,10 +142,10 @@ test('billing failure is actionable for admins and never shown to authors', asyn
       .getByRole('alert')
       .filter({ hasText: 'AI draft unavailable' });
     await expect(banner).toContainText(
-      'OpenAI API credit balance is exhausted',
+      'Gemini requires billing for this request',
     );
-    await expect(banner).toContainText('Add credits in OpenAI Billing');
-    await expect(banner).toContainText('credit_balance_exhausted · HTTP 429');
+    await expect(banner).toContainText('Google AI Studio');
+    await expect(banner).toContainText('billing_required · HTTP 402');
     await expect(
       staff.getByRole('button', { name: 'Regenerate', exact: true }),
     ).toBeEnabled();
@@ -153,7 +153,7 @@ test('billing failure is actionable for admins and never shown to authors', asyn
       staff.getByText('Preparing a suggestion…', { exact: true }),
     ).toHaveCount(0);
     await expect(
-      page.getByText('OpenAI API credit balance is exhausted', {
+      page.getByText('Gemini requires billing for this request', {
         exact: false,
       }),
     ).toHaveCount(0);
@@ -165,6 +165,46 @@ test('billing failure is actionable for admins and never shown to authors', asyn
       path: 'artifacts/ai-billing-error.png',
       fullPage: true,
     });
+  } finally {
+    await context.close();
+  }
+});
+
+test('Gemini quota errors show provider/model and an actionable message', async ({
+  browser,
+  page,
+}) => {
+  await login(page, 'priya.sharma@email.com', 'AuthorDemo!2026');
+  await page.getByRole('button', { name: 'New support query' }).click();
+  await page
+    .getByLabel('Subject', { exact: true })
+    .fill('Gemini quota diagnostics');
+  await page
+    .getByLabel('Tell us a little more')
+    .fill('Please explain my royalty payment schedule.');
+  await page.getByRole('button', { name: 'Send support query' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Gemini quota diagnostics' }),
+  ).toBeVisible();
+  const path = new URL(page.url()).pathname;
+  const context = await browser.newContext();
+  try {
+    const staff = await context.newPage();
+    await login(staff, 'admin@bookleaf.com', 'AdminDemo!2026');
+    await staff.goto(path);
+    const banner = staff
+      .getByRole('alert')
+      .filter({ hasText: 'AI draft unavailable' });
+    await expect(banner).toContainText('Gemini quota or rate limit reached');
+    await expect(banner).toContainText('Google AI Studio');
+    await expect(staff.locator('.ai-provider')).toContainText('Gemini');
+    await expect(page.locator('.ai-provider')).toHaveCount(0);
+    await expect(
+      page.getByText('Gemini quota or rate limit reached', { exact: false }),
+    ).toHaveCount(0);
+    await expect(
+      staff.getByRole('button', { name: 'Use draft' }),
+    ).toBeEnabled();
   } finally {
     await context.close();
   }

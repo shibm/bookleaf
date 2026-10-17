@@ -18,9 +18,20 @@ const ticketSchema = new mongoose.Schema(
     },
     draft: { type: String, default: '' },
     ai_reason: String,
+    ai_provider: {
+      type: String,
+      enum: ['gemini', null],
+      default: null,
+    },
+    ai_model: { type: String, default: null },
     ai_error: {
       type: new mongoose.Schema(
-        { code: String, status: Number, message: String },
+        {
+          code: String,
+          status: Number,
+          message: String,
+          provider: { type: String, enum: ['gemini', null] },
+        },
         { _id: false },
       ),
       default: null,

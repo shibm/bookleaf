@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { User, Book, Ticket, Message } from '../models/index.js';
 import { CATEGORIES, PRIORITIES, STATUSES } from '../constants.js';
 import { fallback } from './ai.js';
+import { aiDiagnostic } from './ai-errors.js';
 import { failure } from '../utils/http-error.js';
 import { text } from '../utils/validation.js';
 export async function getTicket(id, user) {
@@ -20,10 +21,23 @@ export async function getTicket(id, user) {
   t.author_email = author.email;
   t.book = book?.details || null;
   t.assignee_name = assignee?.name || null;
+  // Historical provider failures must not be presented as current Gemini errors.
+  if (
+    user.role === 'admin' &&
+    ((t.ai_provider && t.ai_provider !== 'gemini') ||
+      (t.ai_error?.provider && t.ai_error.provider !== 'gemini'))
+  ) {
+    t.ai_provider = null;
+    t.ai_model = null;
+    t.ai_state = t.ai_state === 'pending' ? 'pending' : 'fallback';
+    t.ai_error = aiDiagnostic('regeneration_required');
+  }
   if (user.role !== 'admin') {
     delete t.draft;
     delete t.ai_reason;
     delete t.ai_error;
+    delete t.ai_provider;
+    delete t.ai_model;
     delete t.assigned_to;
     delete t.assignee_name;
     delete t.ai_state;

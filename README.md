@@ -86,17 +86,29 @@ All 10 author emails in `data/sample-data.json` work with the same author demo p
 
 ## AI configuration and behavior
 
-Set `OPENAI_API_KEY` in `.env` to enable OpenAI. It is used only by the server. `OPENAI_MODEL` defaults to `gpt-4o-mini`, the economical model suggested in the assignment; change it to a compatible structured-output model available to your account. No API key is required to run the complete portal in policy-template fallback mode.
+The response assistant uses **Gemini**. Configure the backend `.env`:
 
-A single Responses API call produces a strict JSON object containing category, priority, draft and rationale. The server validates the response before storing it. The prompt combines shared tone/safety instructions, a category-relevant policy section, the query, the author's first name, and the selected book. It excludes contact details, bank details, other authors, internal notes and ticket history. User content is marked as untrusted input. Model drafts are suggestions: the admin explicitly inserts, edits and sends them.
+```dotenv
+GEMINI_API_KEY=your-gemini-key
+GEMINI_MODEL=gemini-3.1-flash-lite
+AI_TIMEOUT_MS=12000
+```
+
+Get a key from [Google AI Studio](https://aistudio.google.com/apikey). Nodemon restarts the development backend when `.env` changes; production needs a restart. Keys remain server-side. Model and timeout defaults live in `src/config/ai.js`, and the Gemini API adapter lives in `src/services/ai/providers/gemini.js`. No key is required to run the portal with policy-template fallback drafts.
+
+Gemini's selected model offers a free tier subject to eligibility and quota limits; see [current pricing and data-use terms](https://ai.google.dev/gemini-api/docs/pricing). Free-tier content may be used to improve Google's products. Use appropriate project settings before sending real author information.
+
+Each generation makes one Gemini generateContent call and validates the JSON response for category, priority, draft and rationale. The prompt combines shared tone/safety instructions, a category-relevant policy section, the query, the author's first name, and the selected book. It excludes contact details, bank details, other authors, internal notes and ticket history. User content is marked as untrusted input. Model drafts are suggestions: the admin explicitly inserts, edits and sends them.
+
+Click **Regenerate** on an existing ticket to create a fresh Gemini draft. Historical drafts from a retired provider show a regeneration notice instead of obsolete billing diagnostics. Conversation messages remain unchanged. The admin Response assistant shows the Gemini model used for each generation.
 
 Policies cover the 80/20 **net profit** split, quarterly/45-day cycle, ₹1,000 rollover threshold, ISBN escalation, verified free reprints, distribution sync, production stages and metadata updates. The available data cannot establish bank linkage, platform-level sales or a specific next payout date, so those are never calculated from aggregate balances.
 
-Cost controls: one initial combined call per query, relevant policy retrieval rather than full history, capped input/output, persisted drafts, per-process job deduplication and rate-limited explicit regeneration. `store:false` disables response storage by the Responses endpoint; external processing still occurs when enabled. The provider timeout defaults to 12 seconds. Errors, rate limits, refusal/incomplete responses and malformed output produce a labeled deterministic fallback. Tickets are saved before AI starts, and manual replies remain available. Pending jobs are recovered on server restart. Human category and priority overrides survive late AI results.
+Cost controls: one initial combined call per query, relevant policy retrieval rather than full history, capped input/output, persisted drafts, per-process job deduplication and rate-limited explicit regeneration. External processing occurs when Gemini is enabled. The provider timeout defaults to 12 seconds. Errors, rate limits, refusal/incomplete responses and malformed output produce a labeled deterministic fallback. Tickets are saved before AI starts, and manual replies remain available. Pending jobs are recovered on server restart. Human category and priority overrides survive late AI results.
 
-AI provider failures are logged with allowlisted error codes and HTTP status, and stored as admin-only `ai_error` diagnostics on the ticket. The Response assistant shows specific instructions for exhausted credits, quota/spend limits, invalid credentials, rate limiting, timeouts, unavailable models, and provider outages. Raw provider messages, API keys and ticket content are never included in these logs. Authors receive no provider diagnostics, and manual replies remain available. Regeneration clears old diagnostics; successful generation clears the error. Startup, seeding and frontend builds do not call OpenAI, so billing errors appear when a ticket actually attempts AI generation. Previously saved fallback drafts need regeneration to capture a specific failure cause.
+AI provider failures are logged with allowlisted error codes and HTTP status, and stored as admin-only `ai_error` diagnostics on the ticket. The Response assistant shows specific instructions for quota limits, billing requirements, invalid credentials, rate limiting, timeouts, unavailable models, and provider outages. Raw provider messages, API keys and ticket content are never included in these logs. Authors receive no provider diagnostics, and manual replies remain available. Regeneration clears old diagnostics; successful generation clears the error. Startup, seeding and frontend builds do not call Gemini, so billing errors appear when a ticket actually attempts AI generation. Previously saved fallback drafts need regeneration to capture a specific failure cause.
 
-Implementation references: [official OpenAI Structured Outputs documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses). Live API behavior requires your key and model access; provider success/failure paths are covered with mocked responses.
+Implementation reference: [Gemini structured outputs](https://ai.google.dev/gemini-api/docs/structured-output). Provider success/failure paths are covered with mocked responses. A synthetic live request with the configured key successfully generated a validated Gemini draft.
 
 ## Visual design
 
@@ -135,7 +147,7 @@ npm run build
 npm run test:e2e
 ```
 
-**Verified:** production build, all 16 backend/AI tests, and both Chrome browser workflows (conversation lifecycle/mobile navigation and admin billing-error visibility) pass.
+**Verified:** production build, all 18 backend/AI tests, and all three Chrome browser workflows (conversation lifecycle/mobile navigation, Gemini billing diagnostics, and Gemini quota diagnostics) pass.
 
 `npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.js` for the browser setup.
 
@@ -145,7 +157,7 @@ Source delivery is complete; no public deployment or collaborator invitation has
 
 - Build command: `npm ci && npm run build`.
 - Start command: `npm start`.
-- Environment: `MONGODB_URI`, `SESSION_SECRET` (32+ random characters), `NODE_ENV=production`, `PORT` supplied by the host, optional `OPENAI_API_KEY`/`OPENAI_MODEL`.
+- Environment: `MONGODB_URI`, `SESSION_SECRET` (32+ random characters), `NODE_ENV=production`, `PORT` supplied by the host, optional `GEMINI_API_KEY`/`GEMINI_MODEL` and `AI_TIMEOUT_MS`.
 - Use HTTPS. Production session cookies are secure; set `TRUST_PROXY=true` only behind a trusted single reverse proxy terminating HTTPS.
 - Set `SEED_DEMO=true` only for a dedicated evaluation database; disable it for real deployments and provision real accounts. The startup seed is idempotent.
 - Health check: `/health`. MongoDB stores records and sessions outside the application container; ephemeral application files are fine.

@@ -31,7 +31,7 @@ test(
           PORT: String(occupied.address().port),
           NODE_ENV: 'test',
           SEED_DEMO: 'false',
-          OPENAI_API_KEY: '',
+          GEMINI_API_KEY: '',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       });

@@ -10,15 +10,17 @@ await connectDatabase(mongo.getUri('bookleaf_browser_test'));
 await seed();
 const app = createApp({
   suggestion: async (...args) =>
-    args[0].subject === 'AI billing diagnostics'
+    ['AI billing diagnostics', 'Gemini quota diagnostics'].includes(
+      args[0].subject,
+    )
       ? generateSuggestion(...args, {
           apiKey: 'browser-test-key',
           fetchImpl: async () => ({
             ok: false,
-            status: 429,
+            status: args[0].subject === 'AI billing diagnostics' ? 402 : 429,
             json: async () => ({
               error: {
-                code: 'credit_balance_exhausted',
+                status: 'RESOURCE_EXHAUSTED',
                 message: 'Do not expose provider message',
               },
             }),

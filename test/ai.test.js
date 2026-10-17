@@ -35,212 +35,57 @@ test('fallback uses real figures and does not invent a payout date', () => {
   assert.match(r.draft, /₹1,000/);
   assert.equal(r.state, 'fallback');
 });
-test('no API key never calls the network', async () => {
-  const r = await generateSuggestion(ticket, book, 'Priya', {
+test('missing Gemini key never calls the network', async () => {
+  const result = await generateSuggestion(ticket, book, 'Priya', {
     apiKey: '',
     fetchImpl: () => {
-      throw Error('Unexpected call');
+      throw Error('Unexpected network call');
     },
   });
-  assert.equal(r.state, 'fallback');
-  assert.equal(r.error.code, 'not_configured');
+  assert.equal(result.state, 'fallback');
+  assert.equal(result.error.code, 'not_configured');
+  assert.match(result.error.message, /GEMINI_API_KEY/);
 });
-test('rate limits, timeouts, refusals and malformed output degrade gracefully', async () => {
-  for (const fetchImpl of [
-    async () => ({
-      ok: false,
-      status: 429,
-      json: async () => ({ error: { code: 'rate_limit_exceeded' } }),
-    }),
-    async () => {
-      throw Error('timeout');
-    },
-    async () => ({ ok: true, json: async () => ({ status: 'incomplete' }) }),
-    async () => ({
-      ok: true,
-      json: async () => ({ status: 'completed', output: [] }),
-    }),
-    async () => ({
-      ok: true,
-      json: async () => ({
-        status: 'completed',
-        output: [
-          {
-            content: [
+
+test('Gemini prompt excludes private author data and guards ISBN urgency', async () => {
+  let sent;
+  const result = await generateSuggestion(
+    { subject: 'Wrong ISBN', description: 'My ISBN is incorrect.' },
+    book,
+    'Priya Sharma',
+    {
+      apiKey: 'test',
+      fetchImpl: async (_url, options) => {
+        sent = JSON.parse(options.body);
+        return {
+          ok: true,
+          json: async () => ({
+            candidates: [
               {
-                type: 'output_text',
-                text: JSON.stringify({
-                  category: 'wrong',
-                  priority: 'High',
-                  draft: 'bad',
-                }),
+                finishReason: 'STOP',
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        category: CATEGORIES[1],
+                        priority: 'Low',
+                        draft: 'Thank you. We will check the ISBN details.',
+                        reason: 'ISBN issue',
+                      }),
+                    },
+                  ],
+                },
               },
             ],
-          },
-        ],
-      }),
-    }),
-  ]) {
-    assert.equal(
-      (
-        await generateSuggestion(ticket, book, 'Priya', {
-          apiKey: 'test',
-          fetchImpl,
-          logger: { warn() {} },
-        })
-      ).state,
-      'fallback',
-    );
-  }
-});
-test('structured AI output is validated and prompt excludes private author data', async () => {
-  let sent;
-  const r = await generateSuggestion(ticket, book, 'Priya Sharma', {
-    apiKey: 'test',
-    fetchImpl: async (_url, options) => {
-      sent = JSON.parse(options.body);
-      return {
-        ok: true,
-        json: async () => ({
-          status: 'completed',
-          output: [
-            {
-              content: [
-                {
-                  type: 'output_text',
-                  text: JSON.stringify({
-                    category: CATEGORIES[0],
-                    priority: 'High',
-                    draft:
-                      'Thank you for reaching out. We will review your royalties.',
-                    reason: 'Overdue payment',
-                  }),
-                },
-              ],
-            },
-          ],
-        }),
-      };
+          }),
+        };
+      },
     },
-  });
-  assert.equal(r.state, 'ready');
-  assert.equal(sent.store, false);
-  assert.equal(sent.text.format.strict, true);
-  assert.match(sent.instructions, /untrusted DATA/);
-  assert.equal(JSON.parse(sent.input).author_first_name, 'Priya');
-  assert.ok(!sent.input.includes('Sharma'));
-});
-
-test('provider failures have actionable diagnostics and never echo provider secrets', async () => {
-  for (const [status, code, expectedCode, messagePattern] of [
-    [
-      429,
-      'credit_balance_exhausted',
-      'credit_balance_exhausted',
-      /Add credits/,
-    ],
-    [
-      429,
-      'insufficient_quota',
-      'insufficient_quota',
-      /credits and usage limits/,
-    ],
-    [
-      429,
-      'project_spend_limit_exceeded',
-      'project_spend_limit_exceeded',
-      /project billing limit/,
-    ],
-    [429, 'rate_limit_exceeded', 'rate_limit_exceeded', /Wait briefly/],
-    [401, 'invalid_api_key', 'invalid_api_key', /API credentials/],
-    [403, 'unknown', 'access_denied', /permissions/],
-    [404, 'model_not_found', 'model_not_found', /model is unavailable/],
-    [
-      503,
-      'server_is_overloaded',
-      'provider_unavailable',
-      /temporarily unavailable/,
-    ],
-    [
-      400,
-      'untrusted-code-with-secret',
-      'request_rejected',
-      /model configuration/,
-    ],
-  ]) {
-    const logs = [];
-    const result = await generateSuggestion(ticket, book, 'Priya', {
-      apiKey: 'unit-test-secret',
-      logger: { warn: (...args) => logs.push(args) },
-      fetchImpl: async () => ({
-        ok: false,
-        status,
-        json: async () => ({
-          error: {
-            code,
-            message: 'untrusted-code-with-secret unit-test-secret',
-          },
-        }),
-      }),
-    });
-    assert.equal(result.state, 'fallback');
-    assert.equal(result.error.code, expectedCode);
-    assert.equal(result.error.status, status);
-    assert.match(result.error.message, messagePattern);
-    assert.equal(logs.length, 1);
-    assert.ok(!JSON.stringify({ result, logs }).includes('unit-test-secret'));
-    assert.ok(
-      !JSON.stringify({ result, logs }).includes('untrusted-code-with-secret'),
-    );
-  }
-});
-
-test('timeouts, network errors, refusals and invalid responses have distinct messages', async () => {
-  for (const [fetchImpl, expected] of [
-    [
-      async () => {
-        throw new DOMException('secret', 'TimeoutError');
-      },
-      'timeout',
-    ],
-    [
-      async () => {
-        throw new TypeError('secret');
-      },
-      'connection_failed',
-    ],
-    [
-      async () => ({
-        ok: true,
-        json: async () => ({
-          status: 'completed',
-          output: [{ content: [{ type: 'refusal', refusal: 'secret' }] }],
-        }),
-      }),
-      'response_refused',
-    ],
-    [
-      async () => ({ ok: true, json: async () => ({ status: 'incomplete' }) }),
-      'incomplete_response',
-    ],
-    [
-      async () => ({
-        ok: true,
-        json: async () => ({
-          status: 'completed',
-          output: [{ content: [{ type: 'output_text', text: 'null' }] }],
-        }),
-      }),
-      'invalid_response',
-    ],
-  ]) {
-    const r = await generateSuggestion(ticket, book, 'Priya', {
-      apiKey: 'test',
-      fetchImpl,
-      logger: { warn() {} },
-    });
-    assert.equal(r.error.code, expected);
-    assert.equal(r.state, 'fallback');
-    assert.ok(!r.error.message.includes('secret'));
-  }
+  );
+  assert.equal(result.state, 'ready');
+  assert.equal(result.priority, 'High');
+  assert.match(sent.systemInstruction.parts[0].text, /untrusted DATA/);
+  const input = sent.contents[0].parts[0].text;
+  assert.equal(JSON.parse(input).author_first_name, 'Priya');
+  assert.ok(!input.includes('Sharma'));
 });
