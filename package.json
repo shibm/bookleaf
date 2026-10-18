@@ -12,7 +12,6 @@
     "dev": "vite --host 127.0.0.1",
     "seed": "node scripts/seed.ts",
     "test": "npm run typecheck && node --test --test-concurrency=1 test/*.test.ts",
-    "package": "python3 scripts/package.py",
     "build": "npm run typecheck && vite build",
     "dev:server": "nodemon src/server.ts",
     "test:e2e": "npm run build && playwright test",
