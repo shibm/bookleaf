@@ -8,14 +8,15 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/server.ts",
     "dev": "vite --host 127.0.0.1",
-    "seed": "node scripts/seed.js",
-    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "seed": "node scripts/seed.ts",
+    "test": "npm run typecheck && node --test --test-concurrency=1 test/*.test.ts",
     "package": "python3 scripts/package.py",
-    "build": "vite build",
-    "dev:server": "nodemon src/server.js",
-    "test:e2e": "npm run build && playwright test"
+    "build": "npm run typecheck && vite build",
+    "dev:server": "nodemon src/server.ts",
+    "test:e2e": "npm run build && playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "connect-mongo": "^5.1.0",
@@ -31,10 +32,16 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.0.0",
     "mongodb-memory-server": "^10.2.0",
     "nodemon": "^3.1.14",
     "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
     "vite": "^7.1.0"
   }
 }

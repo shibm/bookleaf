@@ -16,4 +16,4 @@ COPY --chown=node:node data ./data
 COPY --chown=node:node package.json ./
 USER node
 EXPOSE 3000
-CMD ["node", "src/server.js"]
+CMD ["node", "src/server.ts"]

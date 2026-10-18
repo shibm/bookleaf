@@ -6,6 +6,8 @@ A complete author and operations support portal using **React, Node.js/Express, 
 
 Requires **Node.js 24+**, npm, and MongoDB (local or Atlas).
 
+Application code, tests, and configuration use TypeScript (`.ts`/`.tsx`) with ES module imports and exports. `npm run typecheck` checks the full project in strict mode; both `npm run build` and `npm test` run it automatically. Node.js 24 runs backend TypeScript directly using native type stripping.
+
 ```sh
 npm ci
 cp .env.example .env
@@ -55,7 +57,7 @@ Open **http://localhost:5173** during development. Vite proxies `/api` and `/hea
 
 Nodemon is configured in `nodemon.json`:
 
-- Changes to JavaScript or JSON files in `src/`, or changes to `.env`, automatically restart the backend after a 300 ms delay.
+- Changes to TypeScript or JSON files in `src/`, or changes to `.env`, automatically restart the backend after a 300 ms delay.
 - Changes to API keys and MongoDB settings in `.env` are loaded on restart.
 - Generated builds, dependencies, archives and test output do not trigger backend restarts.
 - Type `rs` and press Enter in the Nodemon terminal to request a manual restart. Press Ctrl+C to stop it.
@@ -94,7 +96,7 @@ GEMINI_MODEL=gemini-3.1-flash-lite
 AI_TIMEOUT_MS=12000
 ```
 
-Get a key from [Google AI Studio](https://aistudio.google.com/apikey). Nodemon restarts the development backend when `.env` changes; production needs a restart. Keys remain server-side. Model and timeout defaults live in `src/config/ai.js`, and the Gemini API adapter lives in `src/services/ai/providers/gemini.js`. No key is required to run the portal with policy-template fallback drafts.
+Get a key from [Google AI Studio](https://aistudio.google.com/apikey). Nodemon restarts the development backend when `.env` changes; production needs a restart. Keys remain server-side. Model and timeout defaults live in `src/config/ai.ts`, and the Gemini API adapter lives in `src/services/ai/providers/gemini.ts`. No key is required to run the portal with policy-template fallback drafts.
 
 Gemini's selected model offers a free tier subject to eligibility and quota limits; see [current pricing and data-use terms](https://ai.google.dev/gemini-api/docs/pricing). Free-tier content may be used to improve Google's products. Use appropriate project settings before sending real author information.
 
@@ -118,16 +120,16 @@ The UI follows [BookLeaf’s public website](https://www.bookleafpub.in/): the o
 
 ```text
 client/                 React SPA, API client, responsive styles
-src/app.js              Express composition and middleware wiring
-src/routes/             Resource routers and endpoint authorization
-src/controllers/        HTTP request/response handling
+src/app.ts              Express composition and middleware wiring
+src/routes/             Route classes, resource routers and endpoint authorization
+src/controllers/        Exported controller classes with static async handlers
 src/middleware/         Authentication, CSRF, rate limits and errors
 src/config/             Database connection and persistent session configuration
 src/utils/              Password hashing, HTTP errors and input validation
 src/models/             Separate User, Book, Ticket and Message schemas/indexes
 src/database/           Idempotent demo seeding
 src/services/           Ticket workflows, queue queries, AI jobs and knowledge base
-src/server.js           Startup, recovery and graceful shutdown
+src/server.ts           Startup, recovery and graceful shutdown
 scripts/                Repeatable seed and source ZIP packaging
 data/sample-data.json  Exact supplied sample dataset
 test/                  Node integration and AI tests
@@ -149,7 +151,7 @@ npm run test:e2e
 
 **Verified:** production build, all 18 backend/AI tests, and all three Chrome browser workflows (conversation lifecycle/mobile navigation, Gemini billing diagnostics, and Gemini quota diagnostics) pass.
 
-`npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.js` for the browser setup.
+`npm test` launches an isolated, temporary MongoDB via mongodb-memory-server and does not use your `MONGODB_URI`. The first run downloads a MongoDB binary and needs internet access. Tests cover seed fidelity/idempotency, login/CSRF/RBAC, cross-author access, private-note redaction, ticket lifecycle, queue filters, conflicts, late AI results, prompt boundaries and provider degradation. Browser tests use an isolated MongoDB as well. On macOS, browser tests use installed Google Chrome. On other systems run `npx playwright install chromium` once. See `playwright.config.ts` for the browser setup.
 
 ## Deployment
 
