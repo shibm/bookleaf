@@ -1,6 +1,9 @@
 {
   "watch": ["src", ".env"],
   "ext": "ts,json,env",
+  "execMap": {
+    "ts": "node"
+  },
   "ignore": ["node_modules/**", "dist/**", "artifacts/**", "test-results/**"],
   "signal": "SIGTERM",
   "delay": 300
