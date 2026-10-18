@@ -136,7 +136,7 @@ export async function listTickets(
         rank: { $indexOfArray: [PRIORITIES, '$priority'] },
       },
     },
-    { $sort: { closed: 1, rank: 1, created_at: 1, _id: 1 } },
+    { $sort: { closed: 1, rank: 1, created_at: -1, _id: 1 } },
     { $skip: (page - 1) * limit },
     { $limit: limit },
   ]);

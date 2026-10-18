@@ -117,6 +117,40 @@ test('author and admin complete a conversation with live updates and private not
   await context.close();
 });
 
+test('accounts can be switched repeatedly after logout without reloading', async ({
+  page,
+}) => {
+  await login(page, 'priya.sharma@email.com', 'AuthorDemo!2026');
+  await page.getByRole('link', { name: 'My books', exact: true }).click();
+
+  const documentRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+      documentRequests.push(request.url());
+  });
+
+  for (const [email, firstName] of [
+    ['sneha.kulkarni@email.com', 'Sneha'],
+    ['priya.sharma@email.com', 'Priya'],
+  ] as const) {
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Your author workspace.' }),
+    ).toBeVisible();
+    await page.getByLabel('Email address').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill('AuthorDemo!2026');
+    await page
+      .getByRole('button', { name: 'Sign in to your workspace' })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: `Welcome back, ${firstName}.` }),
+    ).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  }
+
+  expect(documentRequests).toEqual([]);
+});
+
 test('billing failure is actionable for admins and never shown to authors', async ({
   browser,
   page,

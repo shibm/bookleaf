@@ -6,7 +6,7 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
-let csrf = '';
+let csrf: string = '';
 export async function api<T = unknown>(
   path: string,
   { method = 'GET', body, ...rest }: ApiOptions = {},
@@ -22,6 +22,8 @@ export async function api<T = unknown>(
     ...(body ? { body: JSON.stringify(body) } : {}),
     ...rest,
   });
+  // Logout destroys the session; its token must not be reused for the next login.
+  if (response.ok && path === '/auth/logout') csrf = '';
   if (response.status === 204) return null as T;
   const result = await response.json();
   if (!response.ok) {
